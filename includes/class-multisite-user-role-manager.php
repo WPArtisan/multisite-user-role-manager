@@ -145,31 +145,7 @@ class Multisite_User_Role_Manager {
 
 		$plugin_admin = new Multisite_User_Role_Manager_Admin( $this->get_plugin_name(), $this->get_version() );
 
-		$this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_styles' );
-		$this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_scripts' );
-
-		// Ajax endpoints
-		$this->loader->add_action( 'wp_ajax_get_user_blogs', $plugin_admin, 'ajax_get_user_blogs' );
-		$this->loader->add_action( 'wp_ajax_reassign_user_blog_posts', $plugin_admin, 'ajax_reassign_user_blog_posts' );
-		$this->loader->add_action( 'wp_ajax_set_user_blog_roles', $plugin_admin, 'ajax_set_user_blog_roles' );
-		$this->loader->add_action( 'wp_ajax_remove_user_from_blog', $plugin_admin, 'ajax_remove_user_from_blog' );
-		$this->loader->add_action( 'wp_ajax_get_blogs_wo_user', $plugin_admin, 'ajax_get_blogs_wo_user' );
-		$this->loader->add_action( 'wp_ajax_get_blog_roles', $plugin_admin, 'ajax_get_blog_roles' );
-		$this->loader->add_action( 'wp_ajax_add_user_to_blog', $plugin_admin, 'ajax_add_user_to_blog' );
-
-		// User profile HTML
-		$this->loader->add_action( 'show_user_profile', $plugin_admin, 'template_manage_user_roles', 1 );
-		$this->loader->add_action( 'edit_user_profile', $plugin_admin, 'template_manage_user_roles', 1 );
-
-		// Ajax template
-		$this->loader->add_action( 'admin_footer-user-edit.php', $plugin_admin, 'template_manage_user_blogs_roles_popup' );
-		$this->loader->add_action( 'admin_footer-user-edit.php', $plugin_admin, 'template_user_blogs_roles_row' );
-		$this->loader->add_action( 'admin_footer-user-edit.php', $plugin_admin, 'template_add_user_to_blog' );
-		$this->loader->add_action( 'admin_footer-user-edit.php', $plugin_admin, 'template_user_blog_remove_confirm' );
-		$this->loader->add_action( 'admin_footer-user-edit.php', $plugin_admin, 'template_blog_roles_options' );
-		$this->loader->add_action( 'admin_footer-user-edit.php', $plugin_admin, 'template_notification' );
-		$this->loader->add_action( 'admin_footer-user-edit.php', $plugin_admin, 'template_ajax_spinner' );
-
+		$this->loader->add_action( 'admin_init', $plugin_admin, 'actions' );
 	}
 
 	/**

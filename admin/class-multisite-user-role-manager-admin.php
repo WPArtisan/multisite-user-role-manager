@@ -55,17 +55,57 @@ class Multisite_User_Role_Manager_Admin {
 	}
 
 	/**
+	 * Register all actions and hooks.
+	 *
+	 * @access public
+	 * @return null
+	 */
+	public function actions() {
+		global $pagenow;
+
+		/**
+		 * By default only super-admins can use this plugin.
+		 * If you want to allow other user levels to use it then
+		 * use this filter to enable it
+		 * @param bool Whether the current user is a super admin or not
+		 */
+		if ( ! apply_filters( 'wpmuurm_user_allowed', is_super_admin() ) ||
+			( 'user-edit.php' != $pagenow && 'profile.php' != $pagenow && ( ! defined( 'DOING_AJAX' ) || ! DOING_AJAX ) )
+		)
+			return;
+
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_styles' ) );
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
+
+		// Ajax endpoints
+		add_action( 'wp_ajax_get_user_blogs', array( $this, 'ajax_get_user_blogs' ) );
+		add_action( 'wp_ajax_reassign_user_blog_posts', array( $this, 'ajax_reassign_user_blog_posts' ) );
+		add_action( 'wp_ajax_set_user_blog_roles', array( $this, 'ajax_set_user_blog_roles' ) );
+		add_action( 'wp_ajax_remove_user_from_blog', array( $this, 'ajax_remove_user_from_blog' ) );
+		add_action( 'wp_ajax_get_blogs_wo_user', array( $this, 'ajax_get_blogs_wo_user' ) );
+		add_action( 'wp_ajax_get_blog_roles', array( $this, 'ajax_get_blog_roles' ) );
+		add_action( 'wp_ajax_add_user_to_blog', array( $this, 'ajax_add_user_to_blog' ) );
+
+		// User profile HTML
+		add_action( 'show_user_profile', array( $this, 'template_manage_user_roles' ), 1 );
+		add_action( 'edit_user_profile', array( $this, 'template_manage_user_roles' ), 1 );
+
+		// Ajax template
+		add_action( 'admin_footer', array( $this, 'template_manage_user_blogs_roles_popup' ) );
+		add_action( 'admin_footer', array( $this, 'template_user_blogs_roles_row' ) );
+		add_action( 'admin_footer', array( $this, 'template_add_user_to_blog' ) );
+		add_action( 'admin_footer', array( $this, 'template_user_blog_remove_confirm' ) );
+		add_action( 'admin_footer', array( $this, 'template_blog_roles_options' ) );
+		add_action( 'admin_footer', array( $this, 'template_notification' ) );
+		add_action( 'admin_footer', array( $this, 'template_ajax_spinner' ) );
+	}
+
+	/**
 	 * Register the stylesheets for the admin area.
 	 *
 	 * @since    1.0.0
 	 */
 	public function enqueue_styles() {
-
-		// Only bother loading everything if on the
-		// network admin user edit screen
-		$screen = get_current_screen();
-		if ( 'user-edit-network' != $screen->id )
-			return;
 
 		wp_enqueue_style( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'css/multisite-user-role-manager-admin.css', array(), $this->version, 'all' );
 		wp_enqueue_style( 'jqueryui-editable', dirname( plugin_dir_url( __FILE__ ) ) . '/assets/jqueryui-editable/css/jqueryui-editable.css', array(), $this->version, 'all' );
@@ -78,11 +118,6 @@ class Multisite_User_Role_Manager_Admin {
 	 * @since    1.0.0
 	 */
 	public function enqueue_scripts() {
-		// Only bother loading everything if on the
-		// network admin user edit screen
-		$screen = get_current_screen();
-		if ( 'user-edit-network' != $screen->id )
-			return;
 
 		$js_filename = ! defined( 'WP_DEBUG' ) || ! WP_DEBUG ? 'js/multisite-user-role-manager-admin.js' : 'js/multisite-user-role-manager-admin.min.js';
 
@@ -110,10 +145,10 @@ class Multisite_User_Role_Manager_Admin {
 			$this->plugin_name,
 			'wpmuurm',
 			apply_filters( 'wpmuurm_localize',
-				[
+				array(
 					'user_id' => $user_id,
 					'nonce'   => wp_create_nonce( 'wpmuurm-ajax-nonce' ),
-				]
+				)
 			)
 		);
 	}
@@ -135,12 +170,17 @@ class Multisite_User_Role_Manager_Admin {
 		// Verify permissions
 		$this->verify_ajax_super_admin();
 
-		if ( ! $user_id = absint( $_POST['user_id'] ) ) {
-			wp_send_json_error( array( array( 'type' => 'error', 'message' => __( 'Invalid User ID', 'multisite-user-role-manager' ) ) ) );
+		if ( empty( $_POST['user_id'] ) || ! $user_id = absint( $_POST['user_id'] ) ) {
+			wp_send_json_error( array( array( 'type' => 'error', 'message' => esc_html__( 'Invalid User ID', 'multisite-user-role-manager' ) ) ) );
 		}
 
 		$output = array();
 
+		/**
+		 * Filter the list of blogs returned for a particular user
+		 * @param array All the blogs the user is a member of
+		 * @param int   $user_id The user ID currently being edited
+		 */
 		$user_blogs = apply_filters( 'wpmuurm_user_blogs', get_blogs_of_user( $user_id ), $user_id );
 
 		// Cycle through each blog and get the user's
@@ -150,13 +190,16 @@ class Multisite_User_Role_Manager_Admin {
 			switch_to_blog( $user_blog->userblog_id  );
 			$user_at_different_blog = new WP_User( $user_id, $user_blog->userblog_id );
 
+			// Decode the blog name
+			$user_blog->blogname = wp_kses_decode_entities( $user_blog->blogname );
+
 			// Format the blog roles so they can be used by the JS
 			$formatted_blog_roles = array();
 			foreach ( $blog_roles = get_editable_roles() as $role_slug => $role_details ) {
-				$formatted_blog_roles[] = [
+				$formatted_blog_roles[] = array(
 					'text'  => $role_details['name'],
 					'value' => $role_slug,
-				];
+				);
 			}
 
 			$output[] = array(
@@ -186,15 +229,15 @@ class Multisite_User_Role_Manager_Admin {
 		// Verify permissions
 		$this->verify_ajax_super_admin();
 
-		$new_roles = (array) $_POST['value'];
+		$new_roles = ! empty( $_POST['value'] ) ? (array) $_POST['value'] : array();
 
 		$errors = array();
-		if ( ! $blog_id = absint( $_POST['blog_id'] ) ) {
-			$errors[] = array( 'type' => 'error', 'message' => __( 'Invalid Blog ID', 'multisite-user-role-manager' ) );
+		if ( empty( $_POST['blog_id'] ) || ! $blog_id = absint( $_POST['blog_id'] ) ) {
+			$errors[] = array( 'type' => 'error', 'message' => esc_html__( 'Invalid Blog ID', 'multisite-user-role-manager' ) );
 		}
 
-		if ( ! $user_id = absint( $_POST['user_id'] ) ) {
-			$errors[] = array( 'type' => 'error', 'message' => __( 'Invalid User ID', 'multisite-user-role-manager' ) );
+		if ( empty( $_POST['user_id'] ) || ! $user_id = absint( $_POST['user_id'] ) ) {
+			$errors[] = array( 'type' => 'error', 'message' => esc_html__( 'Invalid User ID', 'multisite-user-role-manager' ) );
 		}
 
 		if ( ! empty( $errors ) ) {
@@ -207,11 +250,23 @@ class Multisite_User_Role_Manager_Admin {
 
 		$roles = array_intersect( array_keys( $blog_roles ), $new_roles );
 
-		$roles = apply_filters( 'wpmuurm_user_new_roles', $roles );
+		$user = new WP_User( $user_id );
 
-		$user = new WP_User(  );
+		/**
+		 * The array of new roles being applied to the user
+		 * @param Array   The new roles for the user
+		 * @param WP_User The user on the blog
+		 * @param int     The blog ID currently being edited
+		 */
+		$roles = apply_filters( 'wpmuurm_user_new_roles', $roles, $user, $blog_id );
 
-		do_action( 'wpmuurm_pre_set_user_blog_roles', $user, $roles );
+		/**
+		 * Do an action before the user is updated with their new roles on
+		 * @param Array   The new roles for the user
+		 * @param WP_User The user on the blog
+		 * @param int     The blog ID currently being edited
+		 */
+		do_action( 'wpmuurm_pre_set_user_blog_roles', $user, $roles, $blog_id );
 
 		// Remove all the existing roles for the user
 		if ( ! empty( $user->roles ) && is_array( $user->roles ) ) {
@@ -227,7 +282,13 @@ class Multisite_User_Role_Manager_Admin {
 			}
 		}
 
-		do_action( 'wpmuurm_post_set_user_blog_roles', $user, $roles );
+		/**
+		 * Do an action after the user is updated with their new roles on
+ 		 * @param Array   The new roles for the user
+ 		 * @param WP_User The user on the blog
+ 		 * @param int     The blog ID currently being edited
+ 		 */
+		do_action( 'wpmuurm_post_set_user_blog_roles', $user, $roles, $blog_id );
 
 		restore_current_blog();
 
@@ -235,8 +296,10 @@ class Multisite_User_Role_Manager_Admin {
 	}
 	/**
 	 * Returns all the users for a blog.
-	 * This is used when we're removing a user from a blog
-	 * and we need to reattribute the posts
+	 * This is used when we're removing a user from a blog and we need to
+	 * re-attribute the posts
+	 *
+	 * @todo Take better account of large user lists
 	 *
 	 * @access public
 	 * @return string
@@ -253,12 +316,12 @@ class Multisite_User_Role_Manager_Admin {
 		$this->verify_ajax_super_admin();
 
 		$errors = array();
-		if ( ! $blog_id = absint( $_POST['blog_id'] ) ) {
-			$errors[] = array( 'type' => 'error', 'message' => __( 'Invalid Blog ID', 'multisite-user-role-manager' ) );
+		if ( empty( $_POST['blog_id'] ) || ! $blog_id = absint( $_POST['blog_id'] ) ) {
+			$errors[] = array( 'type' => 'error', 'message' => esc_html__( 'Invalid Blog ID', 'multisite-user-role-manager' ) );
 		}
 
-		if ( ! $user_id = absint( $_POST['user_id'] ) ) {
-			$errors[] = array( 'type' => 'error', 'message' => __( 'Invalid User ID', 'multisite-user-role-manager' ) );
+		if ( empty( $_POST['user_id'] ) || ! $user_id = absint( $_POST['user_id'] ) ) {
+			$errors[] = array( 'type' => 'error', 'message' => esc_html__( 'Invalid User ID', 'multisite-user-role-manager' ) );
 		}
 
 		if ( ! empty( $errors ) ) {
@@ -282,7 +345,7 @@ class Multisite_User_Role_Manager_Admin {
 			$users = get_users( $args );
 
 			// Cycle through all the users and format the data ready for output
-			$output_data['users'] = array( 'id' => 'none', 'name' => __( 'None', 'multisite-user-role-manager' ) );
+			$output_data['users'] = array( 'id' => 'none', 'name' => esc_html__( 'None', 'multisite-user-role-manager' ) );
 			foreach ( $users as $user ) {
 				$output_data['users'][] = array( 'id' => $user->ID, 'name' => $user->user_email );
 			}
@@ -312,22 +375,34 @@ class Multisite_User_Role_Manager_Admin {
 		$reassign_id = ! empty( $_POST['reassign_id'] ) ? absint( $_POST['reassign_id'] ) : null;
 
 		$errors = array();
-		if ( ! $blog_id = absint( $_POST['blog_id'] ) ) {
-			$errors[] = array( 'type' => 'error', 'message' => __( 'Invalid Blog ID', 'multisite-user-role-manager' ) );
+		if ( empty( $_POST['blog_id'] ) || ! $blog_id = absint( $_POST['blog_id'] ) ) {
+			$errors[] = array( 'type' => 'error', 'message' => esc_html__( 'Invalid Blog ID', 'multisite-user-role-manager' ) );
 		}
 
-		if ( ! $user_id = absint( $_POST['user_id'] ) ) {
-			$errors[] = array( 'type' => 'error', 'message' => __( 'Invalid User ID', 'multisite-user-role-manager' ) );
+		if ( empty( $_POST['user_id'] ) || ! $user_id = absint( $_POST['user_id'] ) ) {
+			$errors[] = array( 'type' => 'error', 'message' => esc_html__( 'Invalid User ID', 'multisite-user-role-manager' ) );
 		}
 
 		if ( ! empty( $errors ) ) {
 			wp_send_json_error( $errors );
 		}
 
+		/**
+		 * Do an action before removing a user from a blog
+		 * @param int      The ID of the user to remove
+		 * @param int      The ID of the blog to remove the user from
+		 * @param int|null The ID of the user to re-assign posts to (if there are any)
+		 */
 		do_action( 'wpmuurm_pre_remove_user_from_blog', $user_id, $blog_id, $reassign_id );
 
 		remove_user_from_blog( $user_id, $blog_id, $reassign_id );
 
+		/**
+		 * Do an action after removing a user from a blog
+		 * @param int      The ID of the user to remove
+		 * @param int      The ID of the blog to remove the user from
+		 * @param int|null The ID of the user to re-assign posts to (if there are any)
+		 */
 		do_action( 'wpmuurm_post_remove_user_from_blog', $user_id, $blog_id, $reassign_id );
 
 		wp_send_json_success();
@@ -352,8 +427,8 @@ class Multisite_User_Role_Manager_Admin {
 
 		global $wpdb;
 
-		if ( ! $user_id = absint( $_POST['user_id'] ) ) {
-			wp_send_json_error( array( array( 'type' => 'error', 'message' => __( 'Invalid User ID', 'multisite-user-role-manager' ) ) ) );
+		if ( empty( $_POST['user_id'] ) || ! $user_id = absint( $_POST['user_id'] ) ) {
+			wp_send_json_error( array( array( 'type' => 'error', 'message' => esc_html__( 'Invalid User ID', 'multisite-user-role-manager' ) ) ) );
 		}
 
 		$placeholders = $where = '';
@@ -392,7 +467,7 @@ class Multisite_User_Role_Manager_Admin {
 		$this->verify_ajax_super_admin();
 
 		if ( ! $blog_id = absint( $_POST['blog_id'] ) ) {
-			wp_send_json_error( array( array( 'type' => 'error', 'message' => __( 'Invalid Blog ID', 'multisite-user-role-manager' ) ) ) );
+			wp_send_json_error( array( array( 'type' => 'error', 'message' => esc_html__( 'Invalid Blog ID', 'multisite-user-role-manager' ) ) ) );
 		}
 
 		switch_to_blog( $blog_id );
@@ -401,12 +476,12 @@ class Multisite_User_Role_Manager_Admin {
 
 		restore_current_blog();
 
-		$output_data = array( 'roles' => [] );
+		$output_data = array( 'roles' => array() );
 		foreach ( $blog_roles as $role_slug => $role_details ) {
-			$output_data['roles'][] = [
+			$output_data['roles'][] = array(
 				'text'  => $role_details['name'],
 				'value' => $role_slug,
-			];
+			);
 		}
 
 		wp_send_json_success( apply_filters( 'ajax_get_blog_roles_output', $output_data ) );
@@ -415,7 +490,8 @@ class Multisite_User_Role_Manager_Admin {
 	/**
 	 * Adds a user to a blog with a specific role
 	 *
-	 * @todo Stricter validation
+	 * @todo Stricter validation on role
+	 *
 	 * @access public
 	 * @return null
 	 */
@@ -430,12 +506,12 @@ class Multisite_User_Role_Manager_Admin {
 		$this->verify_ajax_super_admin();
 
 		$errors = array();
-		if ( ! $blog_id = absint( $_POST['blog_id'] ) ) {
-			$errors[] = array( 'type' => 'error', 'message' => __( 'Invalid Blog ID', 'multisite-user-role-manager' ) );
+		if ( empty( $_POST['blog_id'] ) || ! $blog_id = absint( $_POST['blog_id'] ) ) {
+			$errors[] = array( 'type' => 'error', 'message' => esc_html__( 'Invalid Blog ID', 'multisite-user-role-manager' ) );
 		}
 
-		if ( ! $user_id = absint( $_POST['user_id'] ) ) {
-			$errors[] = array( 'type' => 'error', 'message' => __( 'Invalid User ID', 'multisite-user-role-manager' ) );
+		if ( empty( $_POST['user_id'] ) || ! $user_id = absint( $_POST['user_id'] ) ) {
+			$errors[] = array( 'type' => 'error', 'message' => esc_html__( 'Invalid User ID', 'multisite-user-role-manager' ) );
 		}
 
 		if ( ! empty( $errors ) ) {
@@ -444,13 +520,25 @@ class Multisite_User_Role_Manager_Admin {
 
 		$role = ! empty( $_POST['role'] ) ? $_POST['role'] : null;
 
+		/**
+		 * Do an action before adding a user to a blog
+		 * @param int    The ID of the user to remove
+		 * @param int    The ID of the blog to remove the user from
+		 * @param string The role to assign to the user
+		 */
 		do_action( 'wpmuurm_pre_add_user_to_blog', $user_id, $blog_id, $role );
 
 		$status = add_user_to_blog( $blog_id, $user_id, $role );
 
+		/**
+		 * Do an action before adding a user to a blog
+		 * @param int    The ID of the user to remove
+		 * @param int    The ID of the blog to remove the user from
+		 * @param string The role to assign to the user
+		 */
 		do_action( 'wpmuurm_post_add_user_to_blog', $user_id, $blog_id, $role, $status );
 
-		wp_send_json( [ 'success' => $status ] );
+		wp_send_json( array( 'success' => $status ) );
 	}
 
 	/**
@@ -471,8 +559,14 @@ class Multisite_User_Role_Manager_Admin {
 	 * @return null
 	 */
 	public function verify_ajax_super_admin() {
-		if ( ! is_super_admin() ) {
-			wp_send_json_error( array( array( 'type' => 'error', 'message' => __( 'Only Super Admins can do this', 'multisite-user-role-manager' ) ) ) );
+		/**
+		 * By default only super-admins can use this plugin.
+		 * If you want to allow other user levels to use it then
+		 * use this filter to enable it
+		 * @param bool Whether the current user is a super admin or not
+		 */
+		if ( ! apply_filters( 'wpmuurm_user_allowed', is_super_admin() ) ) {
+			wp_send_json_error( array( array( 'type' => 'error', 'message' => esc_html__( 'You do not have permission to do this', 'multisite-user-role-manager' ) ) ) );
 		}
 	}
 
@@ -487,14 +581,14 @@ class Multisite_User_Role_Manager_Admin {
 		?>
 		<table class="form-table">
 			<tr>
-				<th><label for=""><?php _e( 'User Roles', 'multisite-user-role-manager' ); ?></label></th>
+				<th><label for=""><?php esc_html_e( 'User Roles', 'multisite-user-role-manager' ); ?></label></th>
 				<td>
 					<p>
-						<a href="#TB_inline?height=1200&width=900&inlineId=wpmuurm-thickbox" class="button button-secondary thickbox wpmuurm-launch" title="<?php _e( 'Manage Blog Roles', 'multisite-user-role-manager' ); ?>">
-							<?php _e( 'Manage Roles', 'multisite-user-role-manager' ); ?>
+						<a href="#TB_inline?height=auto&width=800&inlineId=wpmuurm-thickbox" class="button button-secondary thickbox wpmuurm-launch" title="<?php echo sprintf( esc_html__( '%s :: Manage Roles', 'multisite-user-role-manager' ), $user->display_name ); ?>">
+							<?php esc_html_e( 'Manage Roles', 'multisite-user-role-manager' ); ?>
 						</a>
 					</p>
-					<p class="description"><?php _e( 'Manage roles across all blogs', 'multisite-user-role-manager' ); ?></p>
+					<p class="description"><?php esc_html_e( 'Manage roles across all blogs', 'multisite-user-role-manager' ); ?></p>
 				</td>
 			</tr>
 		</table>
@@ -509,22 +603,22 @@ class Multisite_User_Role_Manager_Admin {
 	 */
 	public function template_manage_user_blogs_roles_popup() {
 		?>
-		<div id="wpmuurm-thickbox" class="yay" style="display:none;">
+		<div id="wpmuurm-thickbox" style="display:none;">
 			<div class="wpmuurm-wrapper">
 				<div class="notifications"></div>
 				<table class="wp-list-table widefat fixed">
 					<thead>
 						<tr>
-							<th width="40"><?php _e( '#ID', 'multisite-user-role-manager' ); ?></th>
-							<th><?php _e( 'Site Name', 'multisite-user-role-manager' ); ?></th>
-							<th><?php _e( 'URL', 'multisite-user-role-manager' ); ?></th>
-							<th><?php _e( 'Roles', 'multisite-user-role-manager' ); ?></th>
+							<th width="40"><?php esc_html_e( '#ID', 'multisite-user-role-manager' ); ?></th>
+							<th><?php esc_html_e( 'Site Name', 'multisite-user-role-manager' ); ?></th>
+							<th><?php esc_html_e( 'URL', 'multisite-user-role-manager' ); ?></th>
+							<th><?php esc_html_e( 'Roles', 'multisite-user-role-manager' ); ?></th>
 							<th></th>
 						</tr>
 					</thead>
 					<tbody>
 						<tr>
-							<td colspan="5"><i><?php _e( 'Loading blogs...', 'multisite-user-role-manager' ); ?></i></td>
+							<td colspan="5"><i><?php esc_html_e( 'Loading blogs...', 'multisite-user-role-manager' ); ?></i></td>
 						</tr>
 					</tbody>
 				</table>
@@ -551,7 +645,7 @@ class Multisite_User_Role_Manager_Admin {
 					<a href="#" data-value="{{ data.user_roles }}" roles-editable></a>
 				</td>
 				<td align="right">
-					<a href="#" class="button button-default remove-blog"><?php _e( 'Remove', 'multisite-user-role-manager' ); ?></a>
+					<a href="#" class="button button-default remove-blog"><?php esc_html_e( 'Remove', 'multisite-user-role-manager' ); ?></a>
 				</td>
 			</tr>
 		</script>
@@ -568,16 +662,16 @@ class Multisite_User_Role_Manager_Admin {
 		?>
 		<script type="text/html" id="tmpl-add-user-to-blog">
 			<select class="add-to-blog-blogs">
-				<option value=""><?php _e( 'Add to blog', 'multisite-user-role-manager' ); ?></option>
+				<option value=""><?php esc_html_e( 'Add to blog', 'multisite-user-role-manager' ); ?></option>
 				<# _.each( data, function( blog ) { #>
 					<option value="{{ blog.blog_id }}">{{ blog.domain }}{{ blog.path }}</option>
 				<# }) #>
 			</select>
 
 			<select class="add-to-blog-roles" disabled>
-				<option><?php _e( 'Role', 'multisite-user-role-manager' ); ?></option>
+				<option><?php esc_html_e( 'Role', 'multisite-user-role-manager' ); ?></option>
 			</select>
-			<a href="#" class="button button-primary add-to-blog-submit"><?php _e( 'Add to blog', 'multisite-user-role-manager' ); ?></a>
+			<a href="#" class="button button-primary add-to-blog-submit"><?php esc_html_e( 'Add to blog', 'multisite-user-role-manager' ); ?></a>
 		</script>
 		<?php
 	}
@@ -595,19 +689,19 @@ class Multisite_User_Role_Manager_Admin {
 				<td></td>
 				<td colspan="3">
 					<# if( data.posts_count > 0 ) { #>
-						<strong>{{ data.posts_count  }}</strong> <?php _e( 'posts found. Reassign to:', 'multisite-user-role-manager' ); ?>
+						<strong>{{ data.posts_count  }}</strong> <?php esc_html_e( 'posts found. Reassign to:', 'multisite-user-role-manager' ); ?>
 						<select name="ressaign_to" class="ressaign_to">
 							<# _.each( data.users, function( user ) { #>
 								<option value="{{ user.id }}">{{ user.name }}</option>
 							<# }) #>
 						</select>
 					<# } else { #>
-						<i><?php _e( 'No posts found for User', 'multisite-user-role-manager' ); ?></i>
+						<i><?php esc_html_e( 'No posts found for User', 'multisite-user-role-manager' ); ?></i>
 					<# } #>
 				</td>
 				<td align="right">
-					<a href="#" class="button button-default cancel-user-blog-removal"><?php _e( 'Cancel', 'multisite-user-role-manager' ); ?></a>
-					<a href="#" class="button button-primary confirm-user-blog-removal"><?php _e( 'Confirm', 'multisite-user-role-manager' ); ?></a>
+					<a href="#" class="button button-default cancel-user-blog-removal"><?php esc_html_e( 'Cancel', 'multisite-user-role-manager' ); ?></a>
+					<a href="#" class="button button-primary confirm-user-blog-removal"><?php esc_html_e( 'Confirm', 'multisite-user-role-manager' ); ?></a>
 				</td>
 			</tr>
 		</script>

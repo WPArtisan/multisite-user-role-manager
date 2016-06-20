@@ -3,8 +3,8 @@ Contributors: OzTheGreat
 Donate link: https://ozthegreat.io
 Tags: wpmu, users, roles
 Requires at least: 3.0.1
-Tested up to: 4.3.1
-Stable tag: 4.3.1
+Tested up to: 4.4.2
+Stable tag: 4.2.2
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -41,6 +41,21 @@ Nope, coming in the pro version
 1. The manage user roles screen
 
 == Changelog ==
+
+= 1.0.3 =
+* Fix CSS for role selector
+* Better comments for actions and filters
+* Display the user's name in the model box
+* Stricter translation escaping
+* Make PHP >= 5.2 compatible
+
+= 1.0.2 =
+* Add filter for current user permission
+* Add comments
+
+= 1.0.1 =
+* Conditionally load scripts better
+* Decode entities on blogname
 
 = 1.0 =
 * Plugin released
