@@ -3,17 +3,17 @@
 /**
  * The plugin bootstrap file
  *
- * @link              https://ozthegreat.io
+ * @link              https://wpartisan.me
  * @since             1.0.0
  * @package           Multisite_User_Role_Manager
  *
  * @wordpress-plugin
  * Plugin Name:       Multisite User Role Manager
- * Plugin URI:        https://ozthegreat.io/wordpress/multisite-user-role-manager
+ * Plugin URI:        https://wpartisan.me/plugins/multisite-user-role-manager
  * Description:       Manage user roles for each blog from a single screen on WPMU setups
- * Version:           1.0.3
- * Author:            OzTheGreat
- * Author URI:        https://ozthegreat.io
+ * Version:           1.0.4
+ * Author:            OzTheGreat (WPArtisan)
+ * Author URI:        https://wpartisan.me
  * License:           GPL-2.0+
  * License URI:       http://www.gnu.org/licenses/gpl-2.0.txt
  * Text Domain:       multisite-user-role-manager

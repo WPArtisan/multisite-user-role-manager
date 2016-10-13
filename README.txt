@@ -1,10 +1,10 @@
 === Multisite User Role Manager ===
 Contributors: OzTheGreat
-Donate link: https://ozthegreat.io
+Donate link: https://wpartisan.me
 Tags: wpmu, users, roles
 Requires at least: 3.0.1
-Tested up to: 4.4.2
-Stable tag: 4.2.2
+Tested up to: 4.6.1
+Stable tag: 1.0.4
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -41,6 +41,9 @@ Nope, coming in the pro version
 1. The manage user roles screen
 
 == Changelog ==
+
+= 1.0.4 =
+* WP Version 4.6.1 compatibility
 
 = 1.0.3 =
 * Fix CSS for role selector
