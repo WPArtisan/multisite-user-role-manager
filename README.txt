@@ -2,9 +2,9 @@
 Contributors: ozthegreat
 Donate link: https://wpartisan.me
 Tags: multisite, wpmu, users, roles, management
-Requires at least: 3.0.1
-Tested up to: 4.6.1
-Stable tag: 1.0.5
+Requires at least: 4.0
+Tested up to: 4.7.1
+Stable tag: 1.0.6
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -37,11 +37,14 @@ Nope, coming in the pro version
 
 == Changelog ==
 
+= 1.0.6 =
+* WordPress Version 4.7.1 compatibility
+
 = 1.0.5 =
 * Readme corrections
 
 = 1.0.4 =
-* WP Version 4.6.1 compatibility
+* WordPress Version 4.6.1 compatibility
 
 = 1.0.3 =
 * Fix CSS for role selector

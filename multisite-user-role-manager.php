@@ -11,7 +11,7 @@
  * Plugin Name:       Multisite User Role Manager
  * Plugin URI:        https://wpartisan.me/plugins/multisite-user-role-manager
  * Description:       Manage user roles for each blog from a single screen on WPMU setups
- * Version:           1.0.5
+ * Version:           1.0.6
  * Author:            OzTheGreat (WPArtisan)
  * Author URI:        https://wpartisan.me
  * License:           GPL-2.0+
