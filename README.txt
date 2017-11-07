@@ -3,8 +3,8 @@ Contributors: ozthegreat
 Donate link: https://wpartisan.me
 Tags: multisite, wpmu, users, roles, management
 Requires at least: 4.0
-Tested up to: 4.7.1
-Stable tag: 1.0.6
+Tested up to: 4.8.3
+Stable tag: 1.0.7
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -36,6 +36,9 @@ Nope, coming in the pro version
 1. The manage user roles screen
 
 == Changelog ==
+
+= 1.0.7 =
+* WordPress Version 4.8.3 compatibility
 
 = 1.0.6 =
 * WordPress Version 4.7.1 compatibility
